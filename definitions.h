@@ -1,0 +1,6 @@
+#define PORT 8080
+#define MAX_USERNAME 20
+#define BUFFER_SIZE 1024
+#define MAX_CLIENTS 10
+#define USERNAME_SIZE 21
+
