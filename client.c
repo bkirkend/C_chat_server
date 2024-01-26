@@ -16,10 +16,11 @@ void* receiveMessages(void* arg) {
   free(arg);
   char msgbuf[BUFFER_SIZE];
   while (true) {
+    memset(msgbuf, 0, BUFFER_SIZE * sizeof(char));
     int num_read;
     //printf("trying to read from server\n");
     if((num_read = read(serverSocket, msgbuf, (BUFFER_SIZE * sizeof(char)) - 1)) <= 0){
-      perror("reading from socket\n");
+      perror("disconnected from socket\n");
       break;
     }
     //printf("after read from server\n");
@@ -70,6 +71,7 @@ int main() {
     msgbuf[strcspn(msgbuf, "\n")] = '\0';
     if (strcmp(msgbuf, "exit") == 0) {
       printf("exiting now\n");
+      pthread_join(readThread, NULL);
       break;
     }
 

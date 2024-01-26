@@ -17,9 +17,9 @@ int addClient(int client_fd){
 }
 
 void removeClient(int client_idx){
-    initializedUsername[client_idx] = false;
-    close(clientList[client_idx]);
-    clientList[client_idx] = -1;
+  initializedUsername[client_idx] = false;
+  close(clientList[client_idx]);
+  clientList[client_idx] = -1;
 }
 
 bool isClientListEmpty(void){
@@ -31,6 +31,21 @@ bool isClientListEmpty(void){
   return true;
 }
 
+void broadcast_msg(char* msg){
+  //broadcast message to all connected threads
+  printf("Broadcasting message: %s\n", msg);
+  fflush(stdout);
+  size_t msglen = strlen(msg);
+  for(int i = 0; i < MAX_CLIENTS; i++){
+    if(initializedUsername[i] && clientList[i] != -1){
+      printf("writing to client %d\n", i);
+      if(write(clientList[i], msg, msglen) <= 0){
+        perror("broadcasting message to clients");
+      }
+    }
+  }
+}
+
 void* clientThreadFunc(void* client_idx_ptr){
   int client_idx = *(int *)client_idx_ptr;
   free(client_idx_ptr);
@@ -39,8 +54,6 @@ void* clientThreadFunc(void* client_idx_ptr){
 
   char msginpt[BUFFER_SIZE]; 
   char msgotpt[BUFFER_SIZE];
-  memset(msginpt, 0, BUFFER_SIZE * sizeof(char));
-  memset(msgotpt, 0, BUFFER_SIZE * sizeof(char));
   char username[USERNAME_SIZE];  
   
   printf("trying to get username\n");
@@ -52,31 +65,23 @@ void* clientThreadFunc(void* client_idx_ptr){
   //chat loop
   int valread;
   while(true){
+    memset(msginpt, 0, BUFFER_SIZE * sizeof(char));
+    memset(msgotpt, 0, BUFFER_SIZE * sizeof(char));
     if((valread = read(clientList[client_idx], msginpt, (BUFFER_SIZE - username_act_size) * sizeof(char) - 1)) <= 0){   
       //lock mutex when client leaving
       pthread_mutex_lock(&clientListMutex);
       removeClient(client_idx);
       pthread_mutex_unlock(&clientListMutex);
-      break; 
+
+      //broadcast disconnect to all clients
+      sprintf(msgotpt, "Alert! [%s] has disconnected", username);
+      broadcast_msg(msgotpt); 
+      break;
     }
     //general logic - work from here
     msginpt[valread] = '\0';
     sprintf(msgotpt, "[%s]: %s", username, msginpt);
-    int msglen = strlen(msgotpt) * sizeof(char);
-
-    //broadcast message to all connected threads
-    for(int i = 0; i < MAX_CLIENTS; i++){
-      if(clientList[i] != -1){
-        if(write(clientList[i], msgotpt, msglen) <= 0){
-          perror("broadcasting message to clients");
-        }
-      }
-    }
-
-    //call memset to reset buffers  
-    memset(msginpt, 0, BUFFER_SIZE * sizeof(char));
-    memset(msgotpt, 0, BUFFER_SIZE * sizeof(char));
-    
+    broadcast_msg(msgotpt);
   }
 
   return NULL;
@@ -96,8 +101,11 @@ void get_client_username(int clientSocket, char* username, int username_size){
     }
     //printf("after reading username\n");
   }
-    //append null terminator to string
-    username[bytes_read] = '\0';
+  //append null terminator to string
+  username[bytes_read] = '\0';
+  char connect_msg[BUFFER_SIZE] = {0};
+  sprintf(connect_msg, "Alert! [%s] has connected", username);
+  broadcast_msg(connect_msg); 
 }
 
 pthread_attr_t setThreadDetatch(void){
