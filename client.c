@@ -30,24 +30,43 @@ void* receiveMessages(void* arg) {
   return NULL;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if(argc > 2){
+    printf("invalid usage\n");
+    exit(EXIT_FAILURE);
+  }
   int serverSocket;
-  struct sockaddr_in serverAddress;
-  struct hostent *host;
-
+  
   serverSocket = socket(AF_INET, SOCK_STREAM, 0);
   if (serverSocket == -1) {
     perror("Error in socket creation\n");
     exit(EXIT_FAILURE);
   }
 
+  struct sockaddr_in serverAddress;
   serverAddress.sin_family = AF_INET;
-  serverAddress.sin_port = htons(PORT);
+  serverAddress.sin_port = htons(8080);
 
-  // establish connection through localhost
-  struct in_addr addr;
-  inet_aton("127.0.0.1", &addr);
-  memcpy(&serverAddress.sin_addr, &addr, sizeof(addr));
+  if(argc == 0){
+    // establish connection through localhost
+    struct in_addr addr;
+    inet_aton("127.0.0.1", &addr);
+    memcpy(&serverAddress.sin_addr, &addr, sizeof(addr));
+
+  } else {
+    //connect
+    struct addrinfo hints, *result;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    if(getaddrinfo(argv[1], "8080", &hints, &result) != 0){
+      perror("connection to remote host failed");
+      close(serverSocket);
+      exit(EXIT_FAILURE);
+    }
+    struct sockaddr_in *addr_in = (struct sockaddr_in *)result->ai_addr;
+    memcpy(&serverAddress.sin_addr, &addr_in->sin_addr, sizeof(struct in_addr)); 
+  }
 
   if (connect(serverSocket, (struct sockaddr *)&serverAddress,
               sizeof(serverAddress)) == -1) {
